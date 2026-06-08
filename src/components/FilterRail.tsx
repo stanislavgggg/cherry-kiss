@@ -1,7 +1,7 @@
 import type { Lang } from "@/lib/i18n";
 import { t } from "@/lib/i18n";
 
-export type Tab = "hot" | "news" | "live" | "markets";
+export type Tab = "hot" | "news" | "live" | "markets" | "channel";
 export type NewsSub = "all" | "crypto" | "casino" | "esports";
 
 export function FilterRail({
@@ -22,6 +22,7 @@ export function FilterRail({
     { key: "news", label: t(lang, "news"), icon: "🍒" },
     { key: "live", label: t(lang, "live"), icon: "🎮" },
     { key: "markets", label: t(lang, "markets"), icon: "📈" },
+    { key: "channel", label: t(lang, "channelTab"), icon: "✨" },
   ];
   const subs: { key: NewsSub; label: string }[] = [
     { key: "all", label: t(lang, "all") },
