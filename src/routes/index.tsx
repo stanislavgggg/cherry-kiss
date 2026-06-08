@@ -342,7 +342,15 @@ function StreamPage() {
         </footer>
       </main>
 
-      {gated && <SubscribeBar onSubscribe={onSubscribe} lang={lang} />}
+      {gated && tab !== "channel" && (() => {
+        // Surface-aware sticky:
+        // - markets: always (user has no other CTA)
+        // - live: only after dwell/scroll
+        // - hot/news: only after a lock has been seen
+        if (tab === "markets") return <SubscribeBar onSubscribe={onSubscribe} lang={lang} surface="sticky" />;
+        if (tab === "live") return liveStickyArmed ? <SubscribeBar onSubscribe={onSubscribe} lang={lang} surface="live_sticky" /> : null;
+        return feedLockSeen ? <SubscribeBar onSubscribe={onSubscribe} lang={lang} surface="feed_lock_sticky" /> : null;
+      })()}
       {gated && interstitialOpen && (
         <Interstitial
           lang={lang}
