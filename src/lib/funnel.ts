@@ -125,7 +125,7 @@ export async function getMembership(uid: number | null): Promise<MembershipRespo
   }
 }
 
-export type EventName = "cta_view" | "cta_tap" | "channel_open";
+export type EventName = "cta_view" | "cta_tap" | "channel_open" | "tab_switch" | "cta_dismiss";
 export function trackEvent(event: EventName, meta: Record<string, any> = {}, uid: number | null = null) {
   try {
     const body = JSON.stringify({ event, uid: uid ?? undefined, meta });
