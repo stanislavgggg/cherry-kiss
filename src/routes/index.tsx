@@ -261,7 +261,7 @@ function StreamPage() {
         aria-hidden
         loading="eager"
         className="fixed inset-0 h-full w-full object-cover"
-        style={{ filter: "blur(24px) brightness(0.28) saturate(1.1)", zIndex: -10 }}
+        style={{ filter: "blur(12px) brightness(0.45) saturate(1.1)", zIndex: -10 }}
       />
       <div
         aria-hidden
@@ -269,7 +269,7 @@ function StreamPage() {
         style={{
           zIndex: -9,
           background:
-            "radial-gradient(120% 80% at 50% 40%, rgba(18,6,8,0.45), rgba(18,6,8,0.88))",
+            "radial-gradient(120% 80% at 50% 40%, rgba(18,6,8,0.35), rgba(18,6,8,0.72))",
         }}
       />
       <Header
