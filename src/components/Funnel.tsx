@@ -4,10 +4,18 @@ import { t } from "@/lib/i18n";
 import { trackEvent } from "@/lib/funnel";
 import { getUid, haptic } from "@/lib/telegram";
 
-export function SubscribeBar({ onSubscribe, lang }: { onSubscribe: () => void; lang: Lang }) {
+export function SubscribeBar({
+  onSubscribe,
+  lang,
+  surface = "sticky",
+}: {
+  onSubscribe: () => void;
+  lang: Lang;
+  surface?: string;
+}) {
   useEffect(() => {
-    trackEvent("cta_view", { surface: "sticky" }, getUid());
-  }, []);
+    trackEvent("cta_view", { surface }, getUid());
+  }, [surface]);
   return (
     <div
       className="fixed inset-x-0 bottom-0 z-40 px-3 pt-2"
@@ -20,7 +28,7 @@ export function SubscribeBar({ onSubscribe, lang }: { onSubscribe: () => void; l
         <button
           onClick={() => {
             haptic("medium");
-            trackEvent("cta_tap", { surface: "sticky" }, getUid());
+            trackEvent("cta_tap", { surface }, getUid());
             onSubscribe();
           }}
           className="cr-cta flex w-full items-center justify-center gap-2 rounded-2xl px-4 py-3.5 text-sm font-extrabold tracking-tight sm:text-base"
