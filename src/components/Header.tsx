@@ -50,8 +50,8 @@ export function Header({
           className="h-10 w-10 shrink-0 -mr-0.5 drop-shadow-[0_4px_10px_rgba(225,29,72,0.45)] sm:h-12 sm:w-12"
         />
         <div className="flex-1 min-w-0">
-          <h1 className="cr-wordmark text-xl leading-none sm:text-2xl truncate">{displayName}</h1>
-          <p className="mt-0.5 truncate text-[11px] text-muted-foreground">{tagline}</p>
+          <h1 className="cr-wordmark text-xl leading-none sm:text-2xl truncate">{toStr(displayName, "Cherry Rush")}</h1>
+          <p className="mt-0.5 truncate text-[11px] text-muted-foreground">{toStr(tagline)}</p>
         </div>
         <LangSwitcher lang={lang} onChange={onLang} />
       </div>
