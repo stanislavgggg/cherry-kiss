@@ -367,11 +367,11 @@ function StreamPage() {
   );
 }
 
-function LockedCardWithView({ item, lang, onSubscribe }: { item: NewsItem; lang: any; onSubscribe: () => void }) {
+function LockedCardWithView({ item, lang, onSubscribe, onVisible }: { item: NewsItem; lang: any; onSubscribe: () => void; onVisible?: () => void }) {
   useEffect(() => {
     trackEvent("cta_view", { surface: "feed_lock" }, getUid());
   }, []);
-  return <LockedCard item={item} lang={lang} onSubscribe={onSubscribe} />;
+  return <LockedCard item={item} lang={lang} onSubscribe={onSubscribe} onVisible={onVisible} />;
 }
 
 function SkeletonList() {
