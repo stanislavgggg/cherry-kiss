@@ -31,7 +31,7 @@ export function FilterRail({
   ];
   return (
     <div
-      className="sticky z-20 bg-background/85 backdrop-blur-md border-b border-border"
+      className="sticky z-20 bg-background/70 backdrop-blur-md border-b border-border"
       style={{ top: "var(--cr-header-h, 76px)" }}
     >
       <div className="mx-auto max-w-[480px] px-3 py-2 sm:px-4">

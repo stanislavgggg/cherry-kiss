@@ -21,6 +21,7 @@ import { SubscribeBar, ValueStrip, Interstitial, UnlockBurst } from "@/component
 import { Onboarding } from "@/components/Onboarding";
 import { MarketsPanel, Ticker } from "@/components/Markets";
 import { useLang } from "@/components/LangSwitcher";
+import bgArt from "@/assets/onboarding-bg.jpg";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -250,9 +251,27 @@ function StreamPage() {
 
   return (
     <div
-      className="min-h-screen"
+      className="relative min-h-screen"
       style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 9rem)" }}
     >
+      {/* Themed art backdrop — fixed behind everything */}
+      <img
+        src={bgArt}
+        alt=""
+        aria-hidden
+        loading="eager"
+        className="fixed inset-0 h-full w-full object-cover"
+        style={{ filter: "blur(24px) brightness(0.28) saturate(1.1)", zIndex: -10 }}
+      />
+      <div
+        aria-hidden
+        className="fixed inset-0"
+        style={{
+          zIndex: -9,
+          background:
+            "radial-gradient(120% 80% at 50% 40%, rgba(18,6,8,0.45), rgba(18,6,8,0.88))",
+        }}
+      />
       <Header
         displayName={cfg?.display_name || "Cherry Rush"}
         tagline={cfg?.tagline || "Hot drops. First to know."}

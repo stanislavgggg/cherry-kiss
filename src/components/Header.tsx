@@ -36,7 +36,7 @@ export function Header({
   return (
     <header
       ref={ref}
-      className="sticky top-0 z-30 backdrop-blur-md bg-background/85 border-b border-border"
+      className="sticky top-0 z-30 backdrop-blur-md bg-background/70 border-b border-border"
       style={{ paddingTop: "max(env(safe-area-inset-top), 0px)" }}
     >
       <div className="cr-reel h-1.5" aria-hidden />
