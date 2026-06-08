@@ -16,9 +16,10 @@ import { t, relativeTime } from "@/lib/i18n";
 
 import { Header, MascotEmpty } from "@/components/Header";
 import { FilterRail, type NewsSub, type Tab } from "@/components/FilterRail";
-import { NewsCard, LiveCard, LockedCard } from "@/components/Cards";
+import { NewsCard, LiveCard, LockedCard, LivePinnedCard } from "@/components/Cards";
 import { SubscribeBar, ValueStrip, Interstitial, UnlockBurst } from "@/components/Funnel";
 import { Onboarding } from "@/components/Onboarding";
+import { ChannelPreview } from "@/components/ChannelPreview";
 import { MarketsPanel, Ticker } from "@/components/Markets";
 import { useLang } from "@/components/LangSwitcher";
 import bgArt from "@/assets/onboarding-bg.jpg";
@@ -41,6 +42,8 @@ function StreamPage() {
   const [sub, setSub] = useState<NewsSub>("all");
   const [interstitialOpen, setInterstitialOpen] = useState(false);
   const [showBurst, setShowBurst] = useState(false);
+  const [feedLockSeen, setFeedLockSeen] = useState(false);
+  const [liveStickyArmed, setLiveStickyArmed] = useState(false);
   const opensRef = useRef(0);
   const interstitialCooldownUntil = useRef(0);
   const prevMemberRef = useRef<boolean>(false);
@@ -65,7 +68,7 @@ function StreamPage() {
     queryKey: ["live"],
     queryFn: getLive,
     refetchInterval: 60_000,
-    enabled: tab === "hot" || tab === "live",
+    enabled: tab === "hot" || tab === "live" || tab === "channel",
   });
   const upcomingQ = useQuery({
     queryKey: ["upcoming"],
@@ -132,6 +135,23 @@ function StreamPage() {
     };
   }, [membershipQ]);
 
+  // Reset surface-trigger state on tab switch
+  useEffect(() => {
+    setLiveStickyArmed(false);
+    setFeedLockSeen(false);
+    if (tab !== "live") return;
+    // Arm Live sticky after 6s dwell or >300px scroll
+    const timer = setTimeout(() => setLiveStickyArmed(true), 6000);
+    const onScroll = () => {
+      if (window.scrollY > 300) setLiveStickyArmed(true);
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("scroll", onScroll);
+    };
+  }, [tab]);
+
   // Burst when membership flips false → true
   useEffect(() => {
     if (prevMemberRef.current === false && isMember === true) {
@@ -188,6 +208,16 @@ function StreamPage() {
       }
       return <MarketsPanel market={market} lang={lang} />;
     }
+    if (tab === "channel") {
+      return (
+        <ChannelPreview
+          lang={lang}
+          displayName={cfg?.display_name || "Cherry Rush"}
+          onSubscribe={onSubscribe}
+          pinned={newsItems.slice(0, 3)}
+        />
+      );
+    }
     if (tab === "live") {
       const live = liveQ.data?.matches ?? [];
       const upcoming = upcomingQ.data?.matches ?? [];
@@ -199,10 +229,16 @@ function StreamPage() {
           </MascotEmpty>
         );
       }
+      const all = [...live, ...upcoming];
+      const [pinned, ...rest] = all;
       return (
         <div className="space-y-2.5 px-1">
-          {live.map((m, i) => <LiveCard key={"l" + i} match={m} lang={lang} onSubscribe={onSubscribe} gated={gated} />)}
-          {upcoming.map((m, i) => <LiveCard key={"u" + i} match={m} lang={lang} onSubscribe={onSubscribe} gated={gated} />)}
+          {pinned && gated && (
+            <LivePinnedCard match={pinned} lang={lang} onSubscribe={onSubscribe} />
+          )}
+          {(pinned && !gated ? all : rest).map((m, i) => (
+            <LiveCard key={"l" + i} match={m} lang={lang} />
+          ))}
         </div>
       );
     }
@@ -229,13 +265,21 @@ function StreamPage() {
     return (
       <div className="space-y-2.5 px-1">
         {liveTop.map((m, i) => (
-          <LiveCard key={"hotlive" + i} match={m} lang={lang} onSubscribe={onSubscribe} gated={gated} />
+          <LiveCard key={"hotlive" + i} match={m} lang={lang} />
         ))}
 
         {newsItems.map((item, idx) => {
           const shouldLock = gated && idx >= 2 && (idx - 2) % 3 === 2;
           if (shouldLock) {
-            return <LockedCardWithView key={item.id} item={item} lang={lang} onSubscribe={onSubscribe} />;
+            return (
+              <LockedCardWithView
+                key={item.id}
+                item={item}
+                lang={lang}
+                onSubscribe={onSubscribe}
+                onVisible={() => setFeedLockSeen(true)}
+              />
+            );
           }
           return (
             <div key={item.id} onClick={handleItemOpen}>
@@ -298,7 +342,15 @@ function StreamPage() {
         </footer>
       </main>
 
-      {gated && <SubscribeBar onSubscribe={onSubscribe} lang={lang} />}
+      {gated && tab !== "channel" && (() => {
+        // Surface-aware sticky:
+        // - markets: always (user has no other CTA)
+        // - live: only after dwell/scroll
+        // - hot/news: only after a lock has been seen
+        if (tab === "markets") return <SubscribeBar onSubscribe={onSubscribe} lang={lang} surface="sticky" />;
+        if (tab === "live") return liveStickyArmed ? <SubscribeBar onSubscribe={onSubscribe} lang={lang} surface="live_sticky" /> : null;
+        return feedLockSeen ? <SubscribeBar onSubscribe={onSubscribe} lang={lang} surface="feed_lock_sticky" /> : null;
+      })()}
       {gated && interstitialOpen && (
         <Interstitial
           lang={lang}
@@ -315,11 +367,11 @@ function StreamPage() {
   );
 }
 
-function LockedCardWithView({ item, lang, onSubscribe }: { item: NewsItem; lang: any; onSubscribe: () => void }) {
+function LockedCardWithView({ item, lang, onSubscribe, onVisible }: { item: NewsItem; lang: any; onSubscribe: () => void; onVisible?: () => void }) {
   useEffect(() => {
     trackEvent("cta_view", { surface: "feed_lock" }, getUid());
   }, []);
-  return <LockedCard item={item} lang={lang} onSubscribe={onSubscribe} />;
+  return <LockedCard item={item} lang={lang} onSubscribe={onSubscribe} onVisible={onVisible} />;
 }
 
 function SkeletonList() {
