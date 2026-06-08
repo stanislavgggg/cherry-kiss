@@ -21,6 +21,7 @@ import { SubscribeBar, ValueStrip, Interstitial, UnlockBurst } from "@/component
 import { Onboarding } from "@/components/Onboarding";
 import { MarketsPanel, Ticker } from "@/components/Markets";
 import { useLang } from "@/components/LangSwitcher";
+import bgArt from "@/assets/onboarding-bg.jpg";
 
 export const Route = createFileRoute("/")({
   head: () => ({
