@@ -265,13 +265,21 @@ function StreamPage() {
     return (
       <div className="space-y-2.5 px-1">
         {liveTop.map((m, i) => (
-          <LiveCard key={"hotlive" + i} match={m} lang={lang} onSubscribe={onSubscribe} gated={gated} />
+          <LiveCard key={"hotlive" + i} match={m} lang={lang} />
         ))}
 
         {newsItems.map((item, idx) => {
           const shouldLock = gated && idx >= 2 && (idx - 2) % 3 === 2;
           if (shouldLock) {
-            return <LockedCardWithView key={item.id} item={item} lang={lang} onSubscribe={onSubscribe} />;
+            return (
+              <LockedCardWithView
+                key={item.id}
+                item={item}
+                lang={lang}
+                onSubscribe={onSubscribe}
+                onVisible={() => setFeedLockSeen(true)}
+              />
+            );
           }
           return (
             <div key={item.id} onClick={handleItemOpen}>
