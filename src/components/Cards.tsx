@@ -50,35 +50,45 @@ export function NewsCard({ item, lang }: { item: NewsItem; lang: Lang }) {
   );
 }
 
-export function LiveCard({ match, lang, onSubscribe }: { match: BackendMatch; lang: Lang; onSubscribe: () => void }) {
+export function LiveCard({
+  match,
+  lang,
+  onSubscribe,
+  gated,
+}: {
+  match: BackendMatch;
+  lang: Lang;
+  onSubscribe: () => void;
+  gated?: boolean;
+}) {
   const onTap = () => {
     haptic("light");
-    trackEvent("cta_tap", { surface: "live_match", game: match.game }, getUid());
-    onSubscribe();
+    trackEvent("cta_tap", { surface: "live_match", game: match.game, gated: !!gated }, getUid());
+    if (gated) onSubscribe();
   };
   const live = match.score1 != null || match.score2 != null;
   return (
     <button onClick={onTap} className="cr-card cr-rise w-full text-left p-3 active:scale-[0.99] transition">
-      <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-        <span className="font-semibold uppercase tracking-wider text-foreground/80">
+      <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
+        <span className="truncate font-semibold uppercase tracking-wider text-foreground/80">
           {match.game}{match.league ? ` · ${match.league}` : ""}
         </span>
         {live ? (
-          <span className="cr-pulse-dot text-[10px] font-bold tracking-widest text-cherry">
+          <span className="shrink-0 cr-pulse-dot text-[10px] font-bold tracking-widest text-cherry">
             {t(lang, "liveNow")}
           </span>
         ) : (
-          <span className="text-[10px] font-semibold uppercase tracking-widest text-gold">
+          <span className="shrink-0 text-[10px] font-semibold uppercase tracking-widest text-gold">
             {t(lang, "upcoming")}
           </span>
         )}
       </div>
-      <div className="mt-2 flex items-center justify-between gap-3">
-        <span className="flex-1 truncate text-[15px] font-semibold text-foreground">{match.team1}</span>
-        <span className="cr-gold-text whitespace-nowrap font-display text-xl font-bold">
+      <div className="mt-2 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+        <span className="truncate text-[14px] font-semibold text-foreground sm:text-[15px]">{match.team1}</span>
+        <span className="cr-gold-text whitespace-nowrap font-display text-lg font-bold sm:text-xl">
           {match.score1 ?? "–"} : {match.score2 ?? "–"}
         </span>
-        <span className="flex-1 truncate text-right text-[15px] font-semibold text-foreground">{match.team2}</span>
+        <span className="truncate text-right text-[14px] font-semibold text-foreground sm:text-[15px]">{match.team2}</span>
       </div>
       {match.begin_at && !live && (
         <p className="mt-1 text-right text-[11px] text-muted-foreground">

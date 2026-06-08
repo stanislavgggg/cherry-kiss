@@ -38,16 +38,16 @@ export function MarketsPanel({ market, lang }: { market: NewsMarket | null; lang
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <div className="cr-card p-3">
+      <div className="grid grid-cols-2 gap-2 sm:gap-3">
+        <div className="cr-card min-w-0 p-3">
           <p className="text-[11px] text-muted-foreground">{t(lang, "mcap24")}</p>
-          <p className={`mt-1 font-display text-xl font-bold ${(market.mcap_change_24h ?? 0) >= 0 ? "text-[var(--up)]" : "text-[var(--down)]"}`}>
+          <p className={`mt-1 truncate font-display text-lg font-bold sm:text-xl ${(market.mcap_change_24h ?? 0) >= 0 ? "text-[var(--up)]" : "text-[var(--down)]"}`}>
             {fmtPct(market.mcap_change_24h)}
           </p>
         </div>
-        <div className="cr-card p-3">
+        <div className="cr-card min-w-0 p-3">
           <p className="text-[11px] text-muted-foreground">{t(lang, "btcDom")}</p>
-          <p className="mt-1 font-display text-xl font-bold cr-gold-text">
+          <p className="mt-1 truncate font-display text-lg font-bold cr-gold-text sm:text-xl">
             {market.btc_dominance != null ? `${market.btc_dominance.toFixed(1)}%` : "–"}
           </p>
         </div>

@@ -18,6 +18,7 @@ import { Header, MascotEmpty } from "@/components/Header";
 import { FilterRail, type NewsSub, type Tab } from "@/components/FilterRail";
 import { NewsCard, LiveCard, LockedCard } from "@/components/Cards";
 import { SubscribeBar, ValueStrip, Interstitial, UnlockBurst } from "@/components/Funnel";
+import { Onboarding } from "@/components/Onboarding";
 import { MarketsPanel, Ticker } from "@/components/Markets";
 import { useLang } from "@/components/LangSwitcher";
 
@@ -35,12 +36,13 @@ export const Route = createFileRoute("/")({
 
 function StreamPage() {
   const [lang, setLang] = useLang();
-  const [tab, setTab] = useState<Tab>("hot");
+  const [tab, setTabState] = useState<Tab>("hot");
   const [sub, setSub] = useState<NewsSub>("all");
   const [interstitialOpen, setInterstitialOpen] = useState(false);
   const [showBurst, setShowBurst] = useState(false);
   const opensRef = useRef(0);
-  const interstitialShownRef = useRef(false);
+  const interstitialCooldownUntil = useRef(0);
+  const prevMemberRef = useRef<boolean>(false);
   const uid = useMemo(() => (typeof window !== "undefined" ? getUid() : null), []);
 
   const configQ = useQuery({ queryKey: ["config"], queryFn: getConfig, staleTime: 5 * 60_000 });
@@ -84,52 +86,81 @@ function StreamPage() {
     haptic("success");
     trackEvent("channel_open", { url: channelUrl }, uid);
     openChannel(channelUrl);
-  }, [channelUrl, uid]);
+    // Poll membership for a brief window so unlock fires fast on return.
+    const t1 = setTimeout(() => membershipQ.refetch(), 2_000);
+    const t2 = setTimeout(() => membershipQ.refetch(), 6_000);
+    const t3 = setTimeout(() => membershipQ.refetch(), 12_000);
+    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
+  }, [channelUrl, uid, membershipQ]);
 
-  // Interstitial trigger: after 3 item-opens OR ~8 scrolls (once per session)
+  const setTab = useCallback((next: Tab) => {
+    if (next === tab) return;
+    trackEvent("tab_switch", { from: tab, to: next }, uid);
+    setTabState(next);
+    // Re-arm interstitial on tab change after a cooldown.
+    if (gated && Date.now() > interstitialCooldownUntil.current && opensRef.current >= 2 && !interstitialOpen) {
+      // soft re-arm — actual open still requires opens/scrolls
+    }
+  }, [tab, uid, gated, interstitialOpen]);
+
+  // Scroll-based interstitial trigger (gated only)
   useEffect(() => {
     if (!gated) return;
-    if (interstitialShownRef.current) return;
     let scrolls = 0;
     const onScroll = () => {
       scrolls++;
-      if (scrolls >= 8 && !interstitialShownRef.current) {
-        interstitialShownRef.current = true;
+      if (scrolls >= 8 && Date.now() > interstitialCooldownUntil.current && !interstitialOpen) {
         setInterstitialOpen(true);
+        scrolls = 0;
       }
     };
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
-  }, [gated]);
+  }, [gated, interstitialOpen]);
 
-  // Unlock-on-return: re-check membership on focus
+  // Re-check membership on focus / visibility
   useEffect(() => {
-    const prevMember = isMember;
     const onVis = () => {
-      if (document.visibilityState === "visible") {
-        membershipQ.refetch();
-      }
+      if (document.visibilityState === "visible") membershipQ.refetch();
     };
     document.addEventListener("visibilitychange", onVis);
     window.addEventListener("focus", onVis);
-    // burst trigger via watching isMember change
-    if (prevMember === false && membershipQ.data?.gate?.is_member) {
-      setShowBurst(true);
-      setTimeout(() => setShowBurst(false), 1000);
-    }
     return () => {
       document.removeEventListener("visibilitychange", onVis);
       window.removeEventListener("focus", onVis);
     };
-  }, [isMember, membershipQ]);
+  }, [membershipQ]);
+
+  // Burst when membership flips false → true
+  useEffect(() => {
+    if (prevMemberRef.current === false && isMember === true) {
+      setShowBurst(true);
+      haptic("success");
+      const id = setTimeout(() => setShowBurst(false), 1000);
+      prevMemberRef.current = isMember;
+      return () => clearTimeout(id);
+    }
+    prevMemberRef.current = isMember;
+  }, [isMember]);
 
   const handleItemOpen = () => {
-    if (!gated || interstitialShownRef.current) return;
+    if (!gated) return;
     opensRef.current++;
-    if (opensRef.current >= 3) {
-      interstitialShownRef.current = true;
+    if (opensRef.current >= 3 && Date.now() > interstitialCooldownUntil.current && !interstitialOpen) {
       setInterstitialOpen(true);
+      opensRef.current = 0;
     }
+  };
+
+  const closeInterstitial = () => {
+    setInterstitialOpen(false);
+    interstitialCooldownUntil.current = Date.now() + 90_000; // 90s cooldown
+  };
+
+  const refetchAll = () => {
+    newsQ.refetch();
+    if (tab === "hot" || tab === "live") liveQ.refetch();
+    if (tab === "live") upcomingQ.refetch();
   };
 
   const newsItems = newsQ.data?.items ?? [];
@@ -140,36 +171,67 @@ function StreamPage() {
   const renderStream = () => {
     if (tab === "markets") {
       if (newsQ.isLoading) return <SkeletonList />;
+      if (newsQ.isError) {
+        return (
+          <MascotEmpty onRetry={refetchAll} onSubscribe={onSubscribe} lang={lang} showSubscribe={gated}>
+            {t(lang, "error")}
+          </MascotEmpty>
+        );
+      }
+      if (!market) {
+        return (
+          <MascotEmpty onRetry={refetchAll} onSubscribe={onSubscribe} lang={lang} showSubscribe={gated}>
+            {t(lang, "nothingYet")}
+          </MascotEmpty>
+        );
+      }
       return <MarketsPanel market={market} lang={lang} />;
     }
     if (tab === "live") {
       const live = liveQ.data?.matches ?? [];
       const upcoming = upcomingQ.data?.matches ?? [];
       if (liveQ.isLoading && upcomingQ.isLoading) return <SkeletonList />;
-      if (!live.length && !upcoming.length) return <MascotEmpty>{t(lang, "nothingYet")}</MascotEmpty>;
+      if (!live.length && !upcoming.length) {
+        return (
+          <MascotEmpty onRetry={refetchAll} onSubscribe={onSubscribe} lang={lang} showSubscribe={gated}>
+            {t(lang, "nothingYet")}
+          </MascotEmpty>
+        );
+      }
       return (
         <div className="space-y-2.5 px-1">
-          {live.map((m, i) => <LiveCard key={"l" + i} match={m} lang={lang} onSubscribe={onSubscribe} />)}
-          {upcoming.map((m, i) => <LiveCard key={"u" + i} match={m} lang={lang} onSubscribe={onSubscribe} />)}
+          {live.map((m, i) => <LiveCard key={"l" + i} match={m} lang={lang} onSubscribe={onSubscribe} gated={gated} />)}
+          {upcoming.map((m, i) => <LiveCard key={"u" + i} match={m} lang={lang} onSubscribe={onSubscribe} gated={gated} />)}
         </div>
       );
     }
 
     // hot or news → unified feed with locks
     if (newsQ.isLoading) return <SkeletonList />;
-    if (newsQ.isError) return <MascotEmpty>{t(lang, "error")}</MascotEmpty>;
-    if (!newsItems.length) return <MascotEmpty>{t(lang, "nothingYet")}</MascotEmpty>;
+    if (newsQ.isError) {
+      return (
+        <MascotEmpty onRetry={refetchAll} onSubscribe={onSubscribe} lang={lang} showSubscribe={gated}>
+          {t(lang, "error")}
+        </MascotEmpty>
+      );
+    }
+    if (!newsItems.length) {
+      return (
+        <MascotEmpty onRetry={refetchAll} onSubscribe={onSubscribe} lang={lang} showSubscribe={gated}>
+          {t(lang, "nothingYet")}
+        </MascotEmpty>
+      );
+    }
 
     const liveTop = tab === "hot" ? (liveQ.data?.matches ?? []).slice(0, 2) : [];
 
     return (
       <div className="space-y-2.5 px-1">
         {liveTop.map((m, i) => (
-          <LiveCard key={"hotlive" + i} match={m} lang={lang} onSubscribe={onSubscribe} />
+          <LiveCard key={"hotlive" + i} match={m} lang={lang} onSubscribe={onSubscribe} gated={gated} />
         ))}
 
         {newsItems.map((item, idx) => {
-          // gating: first 2 free; then interleave locks every 3rd item
           const shouldLock = gated && idx >= 2 && (idx - 2) % 3 === 2;
           if (shouldLock) {
             return <LockedCardWithView key={item.id} item={item} lang={lang} onSubscribe={onSubscribe} />;
@@ -181,13 +243,16 @@ function StreamPage() {
           );
         })}
 
-        {gated && <ValueStrip lang={lang} />}
+        {gated && <ValueStrip lang={lang} onSubscribe={onSubscribe} />}
       </div>
     );
   };
 
   return (
-    <div className="min-h-screen pb-32">
+    <div
+      className="min-h-screen"
+      style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 9rem)" }}
+    >
       <Header
         displayName={cfg?.display_name || "Cherry Rush"}
         tagline={cfg?.tagline || "Hot drops. First to know."}
@@ -218,10 +283,14 @@ function StreamPage() {
       {gated && interstitialOpen && (
         <Interstitial
           lang={lang}
-          onSubscribe={onSubscribe}
-          onClose={() => setInterstitialOpen(false)}
+          onSubscribe={() => {
+            onSubscribe();
+            closeInterstitial();
+          }}
+          onClose={closeInterstitial}
         />
       )}
+      {gated && <Onboarding lang={lang} onSubscribe={onSubscribe} />}
       {showBurst && <UnlockBurst />}
     </div>
   );

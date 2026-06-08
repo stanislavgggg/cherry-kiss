@@ -33,6 +33,7 @@ const DICT = {
     onboardBody: "A fast feed of news, live scores and markets. Join the channel for the drops.",
     onboardCta: "Join the channel",
     now: "now",
+    retry: "Retry",
   },
   ru: {
     hot: "Огонь",
@@ -66,6 +67,7 @@ const DICT = {
     onboardBody: "Быстрая лента новостей, лайв-счёты и рынки. Подпишись на канал ради дропов.",
     onboardCta: "Подписаться на канал",
     now: "сейчас",
+    retry: "Повторить",
   },
   es: {
     hot: "Hot",
@@ -99,6 +101,7 @@ const DICT = {
     onboardBody: "Feed rápido de noticias, marcadores en vivo y mercados. Únete al canal para los drops.",
     onboardCta: "Únete al canal",
     now: "ahora",
+    retry: "Reintentar",
   },
 } as const;
 

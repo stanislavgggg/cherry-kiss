@@ -30,8 +30,11 @@ export function FilterRail({
     { key: "esports", label: t(lang, "esports") },
   ];
   return (
-    <div className="sticky top-[68px] z-20 bg-background/85 backdrop-blur-md border-b border-border">
-      <div className="mx-auto max-w-[480px] px-4 py-2">
+    <div
+      className="sticky z-20 bg-background/85 backdrop-blur-md border-b border-border"
+      style={{ top: "var(--cr-header-h, 76px)" }}
+    >
+      <div className="mx-auto max-w-[480px] px-3 py-2 sm:px-4">
         <div className="no-scrollbar flex gap-2 overflow-x-auto">
           {tabs.map((x) => {
             const active = tab === x.key;
@@ -39,7 +42,7 @@ export function FilterRail({
               <button
                 key={x.key}
                 onClick={() => onTab(x.key)}
-                className={`shrink-0 rounded-full px-3.5 py-1.5 text-sm font-semibold transition border ${
+                className={`shrink-0 rounded-full px-3.5 py-2 text-sm font-semibold transition border min-h-[36px] ${
                   active
                     ? "bg-accent text-accent-foreground border-accent shadow-[var(--shadow-glow-gold)]"
                     : "bg-card text-muted-foreground border-border hover:text-foreground"
@@ -59,7 +62,7 @@ export function FilterRail({
                 <button
                   key={s.key}
                   onClick={() => onSub(s.key)}
-                  className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium transition border ${
+                  className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-medium transition border min-h-[32px] ${
                     active
                       ? "bg-primary text-primary-foreground border-primary"
                       : "bg-transparent text-muted-foreground border-border hover:text-foreground"
