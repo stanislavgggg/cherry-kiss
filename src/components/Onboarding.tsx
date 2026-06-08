@@ -4,6 +4,7 @@ import { t } from "@/lib/i18n";
 import { trackEvent } from "@/lib/funnel";
 import { getUid, haptic } from "@/lib/telegram";
 import ruby from "@/assets/ruby.png";
+import bg from "@/assets/onboarding-bg.jpg";
 
 const KEY = "cr_onboarded_v1";
 
@@ -23,12 +24,38 @@ export function Onboarding({ lang, onSubscribe }: { lang: Lang; onSubscribe: () 
     setOpen(false);
   };
   return (
-    <div className="fixed inset-0 z-[60] flex items-end justify-center bg-background/85 backdrop-blur-md sm:items-center">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center overflow-hidden">
+      {/* Blurred themed backdrop */}
+      <img
+        src={bg}
+        alt=""
+        aria-hidden
+        className="absolute inset-0 h-full w-full object-cover scale-110"
+        style={{ filter: "blur(18px) brightness(0.45) saturate(1.1)" }}
+      />
       <div
-        className="cr-card cr-rise w-full max-w-[480px] rounded-b-none rounded-t-3xl p-6 text-center sm:rounded-3xl"
-        style={{ paddingBottom: "max(env(safe-area-inset-bottom), 1.5rem)" }}
+        aria-hidden
+        className="absolute inset-0"
+        style={{
+          background:
+            "radial-gradient(120% 80% at 50% 50%, rgba(18,6,8,0.55), rgba(18,6,8,0.92))",
+        }}
+      />
+      {/* Centered card */}
+      <div
+        className="relative mx-4 w-full max-w-[420px] rounded-3xl border border-[hsl(var(--gold)/0.35)] bg-background/55 p-6 text-center shadow-[0_30px_80px_-20px_rgba(225,29,72,0.55)] backdrop-blur-xl cr-rise"
+        style={{
+          paddingTop: "max(env(safe-area-inset-top), 1.5rem)",
+          paddingBottom: "max(env(safe-area-inset-bottom), 1.5rem)",
+        }}
       >
-        <img src={ruby} alt="" width={96} height={96} className="mx-auto h-20 w-20 drop-shadow-[0_6px_16px_rgba(225,29,72,0.55)]" />
+        <img
+          src={ruby}
+          alt=""
+          width={96}
+          height={96}
+          className="mx-auto h-20 w-20 drop-shadow-[0_6px_16px_rgba(225,29,72,0.55)]"
+        />
         <h2 className="cr-wordmark mt-3 text-3xl">{t(lang, "onboardTitle")}</h2>
         <p className="mt-2 text-sm text-muted-foreground">{t(lang, "onboardBody")}</p>
         <button
