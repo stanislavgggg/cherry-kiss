@@ -1,70 +1,53 @@
-## Goal
-Поднять CTR на канал, убрав CTA-усталость в Live, создав «постоянный адрес» канала и усилив момент ценности в News. Все поверхности логируются — через 2–3 дня решаем, что отключить.
+## Проблема
 
-## 1. Новая вкладка «Channel» + экран `/channel`
+В Telegram (особенно в встроенном WebView) приложение падает в корневой error boundary (`__root.tsx` → `ErrorComponent` → «Something tripped»). В обычном браузере всё рендерится. Значит, ошибка происходит на клиенте после гидрации, и почти наверняка — в коде, который специфично выполняется в Telegram-окружении.
 
-- В `FilterRail` добавить пятый таб `channel` (иконка ✨/Send, лейбл из i18n `channelTab`). Активный таб подсвечивается gold-glow как другие.
-- Переключение на `channel` НЕ грузит ленту — рендерит новый компонент `ChannelPreview` (внутри `src/routes/index.tsx` через switch по `tab`, чтобы сохранить state и хедер).
-- `src/components/ChannelPreview.tsx` — «витрина»:
-  - Лого канала (ruby + wordmark), описание, бейдж «18+».
-  - Social-proof строка: `getConfig()` если есть `cta.partner_name`/подписчики; fallback — `«N материалов сегодня»` из `newsQ.data.items` (count за 24ч).
-  - 2–3 закреплённых превью-карточки (берём топ-3 `newsItems` как mock pinned posts, помеченные «📌 Pinned»).
-  - Крупная primary-кнопка «Open in Telegram» → `onSubscribe()`.
-  - Маленький линк «How it works» (скролл к секции с 3 буллетами: free hot drops, live commentary, market signals).
-- Аналитика: `cta_view {surface: "channel_screen"}` при маунте, `cta_tap {surface: "channel_screen"}` на основной кнопке, `tab_switch {to: "channel"}` уже работает.
+В логах воркера ошибок от приложения нет (только устаревший `_worker_bundle.json` 404 для preview-SHA, не относится к делу). На опубликованном `cherry-kiss.lovable.app/` сам HTML отдаётся 200 — значит SSR живой, падает именно клиент.
 
-## 2. Live: убрать CTA из карточек, добавить sticky + pinned hero
+## Наиболее вероятные причины
 
-- В `LiveCard` удалить `onClick → onSubscribe` для gated — карточка остаётся информативной и тапабельной только для аналитики (`cta_tap {surface:"live_match"}`), без открытия канала.
-- В `src/routes/index.tsx` для `tab === "live"`:
-  - **Pinned hero**: первый live-матч (или ближайший upcoming) рендерится как `LivePinnedCard` — увеличенная карточка с подписью `Live commentary in channel →`, единственная с явным CTA в контексте. Surface: `live_pinned`.
-  - **Sticky CTA** (Live-only): новый компонент `LiveStickyCTA` — копия `SubscribeBar`, но показывается ТОЛЬКО после 6 секунд на табе ИЛИ скролла >300px. Surface: `live_sticky`. Существующий глобальный `SubscribeBar` на Live скрываем (чтобы не дублировать).
-- Остальные `LiveCard` рендерятся без кнопок-призывов.
+1. **Telegram WebApp скрипт грузится `async`** → в момент `useEffect` в `__root.tsx` он ещё может быть не готов; это безопасно (try/catch). Но в `RootComponent` мы дергаем `w.expand()` — в десктоп-клиенте Telegram некоторые методы кидают исключение. Сейчас всё в try/catch, ОК.
+2. **`detectLang()` / `useLang`** — обращается к `window.Telegram.WebApp.initDataUnsafe.user.language_code`. В Telegram Desktop это объект, но `language_code` может быть `undefined`; код устойчив. Это не источник.
+3. **`/api/event` отдаёт 404** на preview-домене (видно в логах). Сам `trackEvent` использует `keepalive: true` и `.catch(()=>{})` — fetch-промис не падает. Но если в каком-то месте мы вызываем `trackEvent` в `useEffect` несколько раз и ловим `TypeError` — это вылетит. Маловероятно.
+4. **Главный подозреваемый**: `bgArt` фон-картинка `position: fixed; zIndex: -10` поверх Telegram WebView. В Telegram in-app браузере `<img>` с `zIndex: -10` может не рендериться, но это не падение. Это не источник.
+5. **Реальный подозреваемый**: где-то на маршруте `/` мы делаем синхронный доступ к `window` / `document` без `typeof window` гарда, и при первом рендере React 19 + TanStack SSR прокидывает Suspense, который из-за этого падает уже на клиенте. Конкретно — `useMemo(() => getUid(), [])` вычисляется на SSR (uid = null), затем у нас `useQuery({ queryKey: ["membership", uid] })` с `enabled: true` всегда вызывает `getMembership(null)`, который возвращает `null` — ОК. Но `prevMemberRef.current` инициализирован `false`, `isMember` тоже `false` → ОК.
+6. **Самый вероятный реальный источник**: `ErrorComponent` сам что-то репортит через `reportLovableError`, а само приложение возможно роняет какой-то компонент из-за `t(lang, key)` где `key` отсутствует в словаре — но мы только что проверили, все ключи на месте.
 
-## 3. News: лок-стек с intersection-trigger + social proof
+Без console-логов из Telegram точно сказать нельзя. Поэтому план — добавить диагностику и одновременно усилить устойчивость в подозрительных местах.
 
-- Глобальный `SubscribeBar` на табах `hot`/`news` НЕ показывать постоянно. Вместо этого:
-  - В `LockedCard` через `IntersectionObserver` при первом появлении в вьюпорте триггерим показ нового sticky `FeedLockSticky` (тот же sticky CTA, surface: `feed_lock_sticky`). После закрытия — cooldown 60s.
-- В `LockedCard` добавить строку social-proof над кнопкой: `«3 240 читают сейчас · обновлено 2 мин назад»` (число генерим из `item.id` хэшем для стабильности; «обновлено» — из `item.published_at`).
-- `Interstitial` оставить как есть (срабатывает по scroll/opens).
+## Что сделаю
 
-## 4. Onboarding handoff
+### 1. Показать настоящую ошибку в error boundary (dev/preview only)
+В `src/routes/__root.tsx` → `ErrorComponent`: при `import.meta.env.DEV` или на хосте `*-dev.lovable.app` / `id-preview--*` показывать `error.message` и первые 5 строк `error.stack` в `<pre>` под текстом «Something tripped». В проде — оставить как есть. Это сразу скажет, что именно падает в Telegram.
 
-- В `Onboarding.tsx` после нажатия основной CTA не закрывать сразу, а показывать второй шаг `OnboardJoin`:
-  - Заголовок «You're in. One last thing 🍒» / RU «Готово. Последний шаг»
-  - Кнопка «Join channel» → `onSubscribe()` (surface: `onboarding_join`)
-  - Линк «Skip for now» → `close()`
-- Surface уже отслеживается через `cta_view/cta_tap` с `surface: "onboarding_join"`.
+### 2. Глобальный перехват `window.onerror` и `unhandledrejection` на клиенте
+В `RootComponent` (`__root.tsx`) добавить слушатели, которые шлют `trackEvent("cta_view", { surface: "client_error", message, stack })` через уже существующий `/api/event` (даже если 404 — попадёт в network log). Это даст серверный след даже когда у пользователя нет devtools (внутри Telegram).
 
-## 5. Аналитика — единый контракт
+### 3. Защитить рендер от падений вложенных секций
+Обернуть содержимое `StreamPage` (`src/routes/index.tsx`) в локальный `<SectionErrorBoundary>` (новый компонент, простой class component) — тогда корневой error boundary не съест всю страницу, и пользователь увидит хотя бы Header + Filter + сообщение об ошибке в зоне ленты с кнопкой Retry. Это страховка от любых будущих регрессий.
 
-Все новые поверхности через существующий `trackEvent`:
-- `nav_channel_tab` — `tab_switch {to:"channel"}` (уже)
-- `channel_screen` — view + tap
-- `live_pinned` — view + tap
-- `live_sticky` — view + tap
-- `feed_lock` — tap (уже)
-- `feed_lock_sticky` — view + tap (новое)
-- `onboarding_join` — view + tap
+### 4. Подчистить точки риска в Telegram
+- В `__root.tsx` `RootComponent`: убедиться, что `Telegram.WebApp.ready/expand` вызывается ПОСЛЕ `script load` — добавить fallback на `setTimeout(..., 300)` если объекта ещё нет.
+- В `src/lib/telegram.ts` `openChannel`: при отсутствии `Telegram.WebApp.openTelegramLink` и при `typeof window === "undefined"` — no-op (сейчас ок, но добавим явный гард).
+- В `src/components/Onboarding.tsx`: `localStorage` уже в try/catch, оставляем; убедиться, что нет других неосторожных обращений к `window`.
+
+### 5. Проверить и пофиксить /api/event 404
+В логах preview-домена `/api/event` стабильно 404. Это значит трекинг не работает — но что важнее, на проде (`cherry-kiss.lovable.app`) `API_BASE` пустой → fetch уходит на тот же домен, и если там тоже 404, мы теряем диагностику. План: подтвердить, что бэкенд отдаёт `/api/event` на проде; если нет — сделать `trackEvent` no-op при двух последовательных 404 (без повторных попыток), чтобы исключить любые побочные эффекты.
+
+## После раскатки
+Пользователь снова открывает мини-приложение в Telegram. Если ошибка повторится — мы увидим:
+- (a) точный `error.message`/`stack` прямо в UI (на dev/preview),
+- (b) запись в network log на /api/event с полем `surface: "client_error"`,
+- (c) ленту, защищённую локальным boundary, чтобы шапка/фильтры остались живыми.
+
+Дальше точечно фиксим то, что выявит диагностика.
 
 ## Файлы
 
-**Создать:**
-- `src/components/ChannelPreview.tsx`
-- `src/components/LivePinnedCard.tsx`
-- `src/components/LiveStickyCTA.tsx` (или параметризовать `SubscribeBar` через prop `surface`)
-- `src/components/FeedLockSticky.tsx` (или тот же `SubscribeBar` с другим surface + IO-триггером в `LockedCard`)
+- edit `src/routes/__root.tsx` — расширенный ErrorComponent + глобальные window listeners
+- edit `src/routes/index.tsx` — обернуть `renderStream()` в локальный error boundary
+- new `src/components/SectionErrorBoundary.tsx`
+- edit `src/lib/funnel.ts` — авто-отключение `trackEvent` после повторных 404
+- edit `src/lib/telegram.ts` — мелкий guard в `openChannel`
 
-**Изменить:**
-- `src/components/FilterRail.tsx` — добавить таб `channel`
-- `src/components/Cards.tsx` — `LiveCard` без gated-CTA; `LockedCard` + social proof + IO-callback
-- `src/components/Funnel.tsx` — `SubscribeBar` принимает `surface` prop
-- `src/components/Onboarding.tsx` — двухшаговый flow
-- `src/routes/index.tsx` — роутинг таба `channel`, pinned hero на Live, условный показ sticky-баров
-- `src/lib/i18n.ts` — ключи `channelTab`, `channelDesc`, `pinned`, `openInTg`, `liveCommentary`, `readingNow`, `oneLastThing`, `joinChannel`, `skipForNow`
-
-**Без бэкенда.** Никаких новых API — всё на существующих `getConfig/getNews/getLive` и `trackEvent`.
-
-## Out of scope
-- Реальный счётчик подписчиков канала (нет API) — используем стабильный fake/derived из конфига.
-- Отдельный route `/channel` через TanStack — таб внутри `index.tsx` сохраняет state ленты и быстрее; при желании добавим позже.
+Никаких backend изменений.

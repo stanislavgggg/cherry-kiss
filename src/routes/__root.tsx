@@ -38,11 +38,22 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
     reportLovableError(error, { boundary: "tanstack_root_error_component" });
   }, [error]);
 
+  const showDetails =
+    typeof window !== "undefined" &&
+    (import.meta.env.DEV ||
+      /lovable\.app|lovableproject\.com|localhost/.test(window.location.hostname));
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="max-w-md text-center">
         <h1 className="text-xl font-semibold tracking-tight text-foreground">Something tripped.</h1>
         <p className="mt-2 text-sm text-muted-foreground">Try again — the reel will spin back up.</p>
+        {showDetails && (
+          <pre className="mt-4 max-h-48 overflow-auto rounded-lg border border-border bg-card p-3 text-left text-[11px] text-rose">
+            {error?.message}
+            {error?.stack ? "\n\n" + error.stack.split("\n").slice(0, 6).join("\n") : ""}
+          </pre>
+        )}
         <div className="mt-6 flex flex-wrap justify-center gap-2">
           <button
             onClick={() => { router.invalidate(); reset(); }}
@@ -97,11 +108,11 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootShell({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
         <HeadContent />
       </head>
-      <body>
+      <body suppressHydrationWarning>
         {children}
         <Scripts />
       </body>
