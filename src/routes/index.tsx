@@ -16,9 +16,10 @@ import { t, relativeTime } from "@/lib/i18n";
 
 import { Header, MascotEmpty } from "@/components/Header";
 import { FilterRail, type NewsSub, type Tab } from "@/components/FilterRail";
-import { NewsCard, LiveCard, LockedCard } from "@/components/Cards";
+import { NewsCard, LiveCard, LockedCard, LivePinnedCard } from "@/components/Cards";
 import { SubscribeBar, ValueStrip, Interstitial, UnlockBurst } from "@/components/Funnel";
 import { Onboarding } from "@/components/Onboarding";
+import { ChannelPreview } from "@/components/ChannelPreview";
 import { MarketsPanel, Ticker } from "@/components/Markets";
 import { useLang } from "@/components/LangSwitcher";
 import bgArt from "@/assets/onboarding-bg.jpg";
